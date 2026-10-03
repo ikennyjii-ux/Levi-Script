@@ -1,6 +1,6 @@
 --[[
-Levi Hub Mobile - Preto e Rosa
-Base funcional preservada + Recursos Expandidos (Otimizado para Mobile)
+Levi Hub Mobile - Preto e Rosa (v6.0 Definitiva)
+Base 100% original preservada + Otimizações + UI Animada + Auto Emblema + Fly V2
 
 Feita para execução direta em celular.
 ]]
@@ -18,24 +18,22 @@ local StarterPack = game:GetService("StarterPack")
 local localplr = Players.LocalPlayer
 local gui
 
--- Encerra conexões globais da execução anterior
+-- ============================================================
+-- CLEANUP & GERENCIAMENTO DE CONEXÕES
+-- ============================================================
 local sharedEnvironment = typeof(getgenv) == "function" and getgenv() or _G
-if typeof(sharedEnvironment.KeniHubMobileCleanup) == "function" then
-    pcall(sharedEnvironment.KeniHubMobileCleanup)
-end
 if typeof(sharedEnvironment.LeviHubMobileCleanup) == "function" then
     pcall(sharedEnvironment.LeviHubMobileCleanup)
 end
 
 local globalConnections = {}
-local dynamicConnections = {} -- Novo: Gerenciador de conexões dinâmicas otimizadas
+local dynamicConnections = {} 
 
 local function track(connection)
     table.insert(globalConnections, connection)
     return connection
 end
 
--- Nova função: Liga e desliga loops pesados apenas quando necessário
 local function toggleConnection(name, enable, event, callback)
     if enable then
         if not dynamicConnections[name] then
@@ -50,6 +48,9 @@ local function toggleConnection(name, enable, event, callback)
     end
 end
 
+-- ============================================================
+-- CORES E FUNÇÕES DE CRIAÇÃO (UI)
+-- ============================================================
 local COLORS = {
     bg = Color3.fromRGB(18, 17, 21),
     top = Color3.fromRGB(25, 23, 29),
@@ -75,10 +76,7 @@ local function create(className, properties)
 end
 
 local function round(object, radius)
-    create("UICorner", {
-        CornerRadius = UDim.new(0, radius or 10),
-        Parent = object,
-    })
+    create("UICorner", { CornerRadius = UDim.new(0, radius or 10), Parent = object })
 end
 
 local function stroke(object, color, thickness, transparency)
@@ -90,10 +88,10 @@ local function stroke(object, color, thickness, transparency)
     })
 end
 
-local function tween(object, duration, properties)
+local function tween(object, duration, properties, style, direction)
     local animation = TweenService:Create(
         object,
-        TweenInfo.new(duration, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        TweenInfo.new(duration, style or Enum.EasingStyle.Quint, direction or Enum.EasingDirection.Out),
         properties
     )
     animation:Play()
@@ -103,19 +101,15 @@ end
 local function getGuiParent()
     if typeof(gethui) == "function" then
         local success, result = pcall(gethui)
-        if success and result then
-            return result
-        end
+        if success and result then return result end
     end
     return CoreGui
 end
 
 local guiParent = getGuiParent()
-for _, oldName in ipairs({"KeniHubMobile", "LeviHubMobile"}) do
+for _, oldName in ipairs({"LeviHubMobile", "KeniHubMobile"}) do
     local oldGui = guiParent:FindFirstChild(oldName)
-    if oldGui then
-        oldGui:Destroy()
-    end
+    if oldGui then oldGui:Destroy() end
 end
 
 gui = create("ScreenGui", {
@@ -127,24 +121,12 @@ gui = create("ScreenGui", {
     Parent = guiParent,
 })
 
-sharedEnvironment.LeviHubMobileCleanup = function()
-    for _, connection in ipairs(globalConnections) do
-        pcall(function() connection:Disconnect() end)
-    end
-    table.clear(globalConnections)
-    table.clear(dynamicConnections)
+if syn and syn.protect_gui then pcall(syn.protect_gui, gui)
+elseif typeof(protectgui) == "function" then pcall(protectgui, gui) end
 
-    if gui and gui.Parent then  
-        gui:Destroy()  
-    end
-end
-
-if syn and syn.protect_gui then
-    pcall(syn.protect_gui, gui)
-elseif typeof(protectgui) == "function" then
-    pcall(protectgui, gui)
-end
-
+-- ============================================================
+-- CONSTRUÇÃO DA INTERFACE PRINCIPAL
+-- ============================================================
 local main = create("Frame", {
     Name = "Main",
     AnchorPoint = Vector2.new(0.5, 0.5),
@@ -152,14 +134,24 @@ local main = create("Frame", {
     Size = UDim2.fromOffset(330, 450),
     BackgroundColor3 = COLORS.bg,
     BorderSizePixel = 0,
-    ClipsDescendants = true,
+    ClipsDescendants = false, -- Permite DropShadow
     Parent = gui,
 })
 round(main, 16)
 local mainStroke = stroke(main, COLORS.pink, 1.5, 0.15)
 
-local hubScale = create("UIScale", {
-    Scale = 1,
+-- Sombra e Gradiente para melhoria visual
+local dropShadow = create("ImageLabel", {
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.52),
+    Size = UDim2.new(1, 40, 1, 40),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://6015536813",
+    ImageColor3 = Color3.fromRGB(0, 0, 0),
+    ImageTransparency = 0.6,
+    SliceCenter = Rect.new(100, 100, 100, 100),
+    SliceScale = 0.1,
+    ZIndex = 0,
     Parent = main,
 })
 
@@ -171,6 +163,8 @@ local mainGradient = create("UIGradient", {
     Rotation = 35,
     Parent = main,
 })
+
+local hubScale = create("UIScale", { Scale = 0, Parent = main }) -- Começa em 0 para animação
 
 local function updateMainSize()
     local camera = workspace.CurrentCamera
@@ -186,13 +180,23 @@ if workspace.CurrentCamera then
     track(workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateMainSize))
 end
 
+-- ClipsDescendants Holder (para as páginas não vazarem, mas manter a sombra no main)
+local contentHolder = create("Frame", {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    ClipsDescendants = true,
+    ZIndex = 2,
+    Parent = main,
+})
+round(contentHolder, 16)
+
 local header = create("Frame", {
     Name = "Header",
     Size = UDim2.new(1, 0, 0, 50),
     BackgroundColor3 = COLORS.top,
     BorderSizePixel = 0,
     ZIndex = 5,
-    Parent = main,
+    Parent = contentHolder,
 })
 
 create("TextLabel", {
@@ -212,7 +216,7 @@ create("TextLabel", {
     Position = UDim2.fromOffset(15, 28),
     Size = UDim2.new(1, -92, 0, 15),
     BackgroundTransparency = 1,
-    Text = "MOBILE TESTER • v5.0",
+    Text = "MOBILE TESTER • v6.0",
     TextColor3 = COLORS.muted,
     TextSize = 9,
     Font = Enum.Font.GothamMedium,
@@ -243,7 +247,7 @@ local tabBar = create("Frame", {
     BackgroundColor3 = COLORS.top,
     BorderSizePixel = 0,
     ZIndex = 4,
-    Parent = main,
+    Parent = contentHolder,
 })
 round(tabBar, 11)
 
@@ -256,18 +260,14 @@ create("UIListLayout", {
     Parent = tabBar,
 })
 
-create("UIPadding", {
-    PaddingLeft = UDim.new(0, 4),
-    PaddingRight = UDim.new(0, 4),
-    Parent = tabBar,
-})
+create("UIPadding", { PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4), Parent = tabBar })
 
 local pagesHolder = create("Frame", {
     Position = UDim2.fromOffset(8, 104),
     Size = UDim2.new(1, -16, 1, -112),
     BackgroundTransparency = 1,
     ZIndex = 3,
-    Parent = main,
+    Parent = contentHolder,
 })
 
 local function createPage(name)
@@ -278,33 +278,22 @@ local function createPage(name)
         BorderSizePixel = 0,
         CanvasSize = UDim2.fromOffset(0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
-        ScrollBarThickness = 3,
+        ScrollBarThickness = 2,
         ScrollBarImageColor3 = COLORS.pink,
         ScrollingDirection = Enum.ScrollingDirection.Y,
         Visible = false,
         ZIndex = 3,
         Parent = pagesHolder,
     })
-
-    create("UIListLayout", {  
-        Padding = UDim.new(0, 8),  
-        SortOrder = Enum.SortOrder.LayoutOrder,  
-        Parent = page,  
-    })  
-
-    create("UIPadding", {  
-        PaddingTop = UDim.new(0, 2),  
-        PaddingBottom = UDim.new(0, 8),  
-        PaddingLeft = UDim.new(0, 2),  
-        PaddingRight = UDim.new(0, 5),  
-        Parent = page,  
-    })  
+    create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })  
+    create("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 15), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 5), Parent = page })  
     return page
 end
 
 local combatPage = createPage("Combat")
 local playerPage = createPage("Players")
 local movePage = createPage("Movement")
+local worldPage = createPage("World")
 combatPage.Visible = true
 
 local tabButtons = {}
@@ -312,14 +301,14 @@ local tabButtons = {}
 local function createTab(text, page, order)
     local button = create("TextButton", {
         Name = text,
-        Size = UDim2.new(1 / 3, -6, 1, -8),
+        Size = UDim2.new(1 / 4, -4, 1, -8),
         BackgroundColor3 = COLORS.pinkDark,
         BackgroundTransparency = order == 1 and 0.1 or 1,
         BorderSizePixel = 0,
         AutoButtonColor = false,
         Text = text,
         TextColor3 = order == 1 and COLORS.white or COLORS.muted,
-        TextSize = 10,
+        TextSize = 9,
         Font = Enum.Font.GothamSemibold,
         LayoutOrder = order,
         ZIndex = 5,
@@ -342,8 +331,9 @@ local function createTab(text, page, order)
 end
 
 createTab("COMBATE", combatPage, 1)
-createTab("JOGADORES", playerPage, 2)
-createTab("MOVIMENTO", movePage, 3)
+createTab("PLAYERS", playerPage, 2)
+createTab("MOVER", movePage, 3)
+createTab("MUNDO", worldPage, 4)
 
 local toast = create("TextLabel", {
     AnchorPoint = Vector2.new(0.5, 1),
@@ -359,7 +349,7 @@ local toast = create("TextLabel", {
     Font = Enum.Font.GothamSemibold,
     ZIndex = 30,
     Visible = false,
-    Parent = main,
+    Parent = contentHolder,
 })
 round(toast, 10)
 stroke(toast, COLORS.pink, 1, 0.25)
@@ -371,21 +361,19 @@ local function notify(text, color)
     toast.Text = text
     toast.TextColor3 = color or COLORS.white
     toast.Visible = true
-    tween(toast, 0.18, {BackgroundTransparency = 0.05, TextTransparency = 0})
+    tween(toast, 0.25, {BackgroundTransparency = 0.05, TextTransparency = 0}, Enum.EasingStyle.Back)
 
-    task.delay(2, function()  
+    task.delay(2.5, function()  
         if toast.Parent and thisId == toastId then  
-            tween(toast, 0.18, {BackgroundTransparency = 1, TextTransparency = 1})  
+            tween(toast, 0.2, {BackgroundTransparency = 1, TextTransparency = 1})  
             task.wait(0.2)  
-            if thisId == toastId then  
-                toast.Visible = false  
-            end  
+            if thisId == toastId then toast.Visible = false end  
         end  
     end)
 end
 
 -- ============================================================
--- COMPONENTES DE UI
+-- ELEMENTOS DE UI REUTILIZÁVEIS
 -- ============================================================
 
 local function sectionTitle(parent, text)
@@ -402,71 +390,21 @@ local function sectionTitle(parent, text)
     })
 end
 
--- Nova Caixa de Pesquisa
 local function searchBox(parent, placeholder, onChanged)
-    local boxFrame = create("Frame", {
-        Size = UDim2.new(1, -4, 0, 40),
-        BackgroundColor3 = COLORS.card,
-        BorderSizePixel = 0,
-        ZIndex = 4,
-        Parent = parent,
-    })
-    round(boxFrame, 11)
-    stroke(boxFrame, COLORS.stroke, 1, 0.25)
-    
-    local icon = create("TextLabel", {
-        Size = UDim2.fromOffset(30, 40),
-        BackgroundTransparency = 1,
-        Text = "🔍",
-        TextColor3 = COLORS.muted,
-        TextSize = 14,
-        ZIndex = 5,
-        Parent = boxFrame,
-    })
-    
-    local textBox = create("TextBox", {
-        Position = UDim2.fromOffset(30, 0),
-        Size = UDim2.new(1, -35, 1, 0),
-        BackgroundTransparency = 1,
-        Text = "",
-        PlaceholderText = placeholder,
-        PlaceholderColor3 = COLORS.muted,
-        TextColor3 = COLORS.white,
-        TextSize = 11,
-        Font = Enum.Font.GothamMedium,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        ClearTextOnFocus = false,
-        ZIndex = 5,
-        Parent = boxFrame,
-    })
-    
-    textBox:GetPropertyChangedSignal("Text"):Connect(function()
-        onChanged(string.lower(textBox.Text))
-    end)
+    local boxFrame = create("Frame", { Size = UDim2.new(1, -4, 0, 40), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, ZIndex = 4, Parent = parent })
+    round(boxFrame, 11) stroke(boxFrame, COLORS.stroke, 1, 0.25)
+    create("TextLabel", { Size = UDim2.fromOffset(30, 40), BackgroundTransparency = 1, Text = "🔍", TextColor3 = COLORS.muted, TextSize = 14, ZIndex = 5, Parent = boxFrame })
+    local textBox = create("TextBox", { Position = UDim2.fromOffset(30, 0), Size = UDim2.new(1, -35, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = placeholder, PlaceholderColor3 = COLORS.muted, TextColor3 = COLORS.white, TextSize = 11, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 5, Parent = boxFrame })
+    textBox:GetPropertyChangedSignal("Text"):Connect(function() onChanged(string.lower(textBox.Text)) end)
     return textBox
 end
 
 local function actionButton(parent, text, color, callback)
-    local button = create("TextButton", {
-        Size = UDim2.new(1, -4, 0, 44),
-        BackgroundColor3 = COLORS.card,
-        BorderSizePixel = 0,
-        AutoButtonColor = false,
-        Text = text,
-        TextColor3 = color or COLORS.white,
-        TextSize = 12,
-        Font = Enum.Font.GothamSemibold,
-        ZIndex = 4,
-        Parent = parent,
-    })
-    round(button, 11)
-    stroke(button, COLORS.stroke, 1, 0.25)
-
+    local button = create("TextButton", { Size = UDim2.new(1, -4, 0, 44), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, AutoButtonColor = false, Text = text, TextColor3 = color or COLORS.white, TextSize = 12, Font = Enum.Font.GothamSemibold, ZIndex = 4, Parent = parent })
+    round(button, 11) stroke(button, COLORS.stroke, 1, 0.25)
     button.MouseButton1Click:Connect(function()  
-        tween(button, 0.08, {BackgroundColor3 = COLORS.card2})  
-        task.delay(0.1, function()  
-            if button.Parent then tween(button, 0.12, {BackgroundColor3 = COLORS.card}) end  
-        end)  
+        tween(button, 0.1, {BackgroundColor3 = COLORS.card2})  
+        task.delay(0.1, function() if button.Parent then tween(button, 0.15, {BackgroundColor3 = COLORS.card}) end end)  
         callback()  
     end)  
     return button
@@ -474,192 +412,63 @@ end
 
 local function toggleRow(parent, titleText, description, callback)
     local enabled = false
-    local row = create("Frame", {
-        Size = UDim2.new(1, -4, 0, 64),
-        BackgroundColor3 = COLORS.card,
-        BorderSizePixel = 0,
-        ZIndex = 4,
-        Parent = parent,
-    })
-    round(row, 11)
-    stroke(row, COLORS.stroke, 1, 0.25)
-
-    create("TextLabel", {  
-        Position = UDim2.fromOffset(12, 9),  
-        Size = UDim2.new(1, -78, 0, 20),  
-        BackgroundTransparency = 1,  
-        Text = titleText,  
-        TextColor3 = COLORS.white,  
-        TextSize = 12,  
-        Font = Enum.Font.GothamSemibold,  
-        TextXAlignment = Enum.TextXAlignment.Left,  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
-
-    create("TextLabel", {  
-        Position = UDim2.fromOffset(12, 31),  
-        Size = UDim2.new(1, -78, 0, 23),  
-        BackgroundTransparency = 1,  
-        Text = description,  
-        TextColor3 = COLORS.muted,  
-        TextSize = 9,  
-        Font = Enum.Font.Gotham,  
-        TextWrapped = true,  
-        TextXAlignment = Enum.TextXAlignment.Left,  
-        TextYAlignment = Enum.TextYAlignment.Top,  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
-
-    local toggle = create("TextButton", {  
-        AnchorPoint = Vector2.new(1, 0.5),  
-        Position = UDim2.new(1, -12, 0.5, 0),  
-        Size = UDim2.fromOffset(48, 27),  
-        BackgroundColor3 = Color3.fromRGB(73, 66, 74),  
-        BorderSizePixel = 0,  
-        AutoButtonColor = false,  
-        Text = "",  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
+    local row = create("Frame", { Size = UDim2.new(1, -4, 0, 64), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, ZIndex = 4, Parent = parent })
+    round(row, 11) stroke(row, COLORS.stroke, 1, 0.25)
+    create("TextLabel", { Position = UDim2.fromOffset(12, 9), Size = UDim2.new(1, -78, 0, 20), BackgroundTransparency = 1, Text = titleText, TextColor3 = COLORS.white, TextSize = 12, Font = Enum.Font.GothamSemibold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = row })  
+    create("TextLabel", { Position = UDim2.fromOffset(12, 31), Size = UDim2.new(1, -78, 0, 23), BackgroundTransparency = 1, Text = description, TextColor3 = COLORS.muted, TextSize = 9, Font = Enum.Font.Gotham, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 5, Parent = row })  
+    local toggle = create("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(48, 27), BackgroundColor3 = Color3.fromRGB(73, 66, 74), BorderSizePixel = 0, AutoButtonColor = false, Text = "", ZIndex = 5, Parent = row })  
     round(toggle, 14)  
-
-    local circle = create("Frame", {  
-        Position = UDim2.fromOffset(3, 3),  
-        Size = UDim2.fromOffset(21, 21),  
-        BackgroundColor3 = COLORS.white,  
-        BorderSizePixel = 0,  
-        ZIndex = 6,  
-        Parent = toggle,  
-    })  
+    local circle = create("Frame", { Position = UDim2.fromOffset(3, 3), Size = UDim2.fromOffset(21, 21), BackgroundColor3 = COLORS.white, BorderSizePixel = 0, ZIndex = 6, Parent = toggle })  
     round(circle, 11)  
 
     local function set(value, silent)  
         enabled = value  
-        tween(toggle, 0.18, {  
-            BackgroundColor3 = enabled and COLORS.pink or Color3.fromRGB(73, 66, 74),  
-        })  
-        tween(circle, 0.18, {  
-            Position = enabled and UDim2.fromOffset(24, 3) or UDim2.fromOffset(3, 3),  
-        })  
+        tween(toggle, 0.25, { BackgroundColor3 = enabled and COLORS.pink or Color3.fromRGB(73, 66, 74) })  
+        tween(circle, 0.25, { Position = enabled and UDim2.fromOffset(24, 3) or UDim2.fromOffset(3, 3) }, Enum.EasingStyle.Back)  
         callback(enabled)  
-        if not silent then  
-            notify(titleText .. (enabled and ": ON" or ": OFF"), enabled and COLORS.green or COLORS.red)  
-        end  
+        if not silent then notify(titleText .. (enabled and ": ON" or ": OFF"), enabled and COLORS.green or COLORS.red) end  
     end  
-
-    toggle.MouseButton1Click:Connect(function()  
-        set(not enabled, false)  
-    end)  
-
+    toggle.MouseButton1Click:Connect(function() set(not enabled, false) end)  
     return { set = set, get = function() return enabled end, row = row }
 end
 
 local function stepper(parent, labelText, initialValue, minimum, maximum, step, suffix, onChanged)
     local value = initialValue
-    local row = create("Frame", {
-        Size = UDim2.new(1, -4, 0, 48),
-        BackgroundColor3 = COLORS.card,
-        BorderSizePixel = 0,
-        ZIndex = 4,
-        Parent = parent,
-    })
-    round(row, 11)
-    stroke(row, COLORS.stroke, 1, 0.25)
-
-    create("TextLabel", {  
-        Position = UDim2.fromOffset(12, 0),  
-        Size = UDim2.new(1, -148, 1, 0),  
-        BackgroundTransparency = 1,  
-        Text = labelText,  
-        TextColor3 = COLORS.white,  
-        TextSize = 11,  
-        Font = Enum.Font.GothamSemibold,  
-        TextXAlignment = Enum.TextXAlignment.Left,  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
-
-    local valueLabel = create("TextLabel", {  
-        AnchorPoint = Vector2.new(1, 0.5),  
-        Position = UDim2.new(1, -48, 0.5, 0),  
-        Size = UDim2.fromOffset(54, 30),  
-        BackgroundTransparency = 1,  
-        Text = tostring(value) .. suffix,  
-        TextColor3 = COLORS.pinkSoft,  
-        TextSize = 10,  
-        Font = Enum.Font.GothamBold,  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
-
-    local minus = create("TextButton", {  
-        AnchorPoint = Vector2.new(1, 0.5),  
-        Position = UDim2.new(1, -105, 0.5, 0),  
-        Size = UDim2.fromOffset(32, 32),  
-        BackgroundColor3 = COLORS.card2,  
-        BorderSizePixel = 0,  
-        Text = "−",  
-        TextColor3 = COLORS.white,  
-        TextSize = 18,  
-        Font = Enum.Font.GothamBold,  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
+    local row = create("Frame", { Size = UDim2.new(1, -4, 0, 48), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, ZIndex = 4, Parent = parent })
+    round(row, 11) stroke(row, COLORS.stroke, 1, 0.25)
+    create("TextLabel", { Position = UDim2.fromOffset(12, 0), Size = UDim2.new(1, -148, 1, 0), BackgroundTransparency = 1, Text = labelText, TextColor3 = COLORS.white, TextSize = 11, Font = Enum.Font.GothamSemibold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = row })  
+    local valueLabel = create("TextLabel", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -48, 0.5, 0), Size = UDim2.fromOffset(54, 30), BackgroundTransparency = 1, Text = tostring(value) .. suffix, TextColor3 = COLORS.pinkSoft, TextSize = 10, Font = Enum.Font.GothamBold, ZIndex = 5, Parent = row })  
+    local minus = create("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -105, 0.5, 0), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = COLORS.card2, BorderSizePixel = 0, Text = "−", TextColor3 = COLORS.white, TextSize = 18, Font = Enum.Font.GothamBold, ZIndex = 5, Parent = row })  
     round(minus, 8)  
-
-    local plus = create("TextButton", {  
-        AnchorPoint = Vector2.new(1, 0.5),  
-        Position = UDim2.new(1, -8, 0.5, 0),  
-        Size = UDim2.fromOffset(32, 32),  
-        BackgroundColor3 = COLORS.pinkDark,  
-        BorderSizePixel = 0,  
-        Text = "+",  
-        TextColor3 = COLORS.white,  
-        TextSize = 17,  
-        Font = Enum.Font.GothamBold,  
-        ZIndex = 5,  
-        Parent = row,  
-    })  
+    local plus = create("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(32, 32), BackgroundColor3 = COLORS.pinkDark, BorderSizePixel = 0, Text = "+", TextColor3 = COLORS.white, TextSize = 17, Font = Enum.Font.GothamBold, ZIndex = 5, Parent = row })  
     round(plus, 8)  
 
     local function update(newValue)  
         value = math.clamp(newValue, minimum, maximum)  
         valueLabel.Text = tostring(value) .. suffix  
+        tween(valueLabel, 0.1, {TextSize = 13}) task.delay(0.1, function() tween(valueLabel, 0.15, {TextSize = 10}) end)
         onChanged(value)  
     end  
-
     minus.MouseButton1Click:Connect(function() update(value - step) end)  
     plus.MouseButton1Click:Connect(function() update(value + step) end)  
-
     return { get = function() return value end, set = update }
 end
 
 -- ============================================================
--- ARRASTO, MINIMIZAR E ANIMAÇÕES
+-- ARRASTO E ANIMAÇÕES DO HUB
 -- ============================================================
-
 local dragging = false
 local dragInput, dragStart, startPos
 
 header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = main.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
+        dragging = true; dragStart = input.Position; startPos = main.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
     end
 end)
-
 header.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
 end)
-
 track(UserInputService.InputChanged:Connect(function(input)
     if dragging and input == dragInput then
         local delta = input.Position - dragStart
@@ -667,34 +476,18 @@ track(UserInputService.InputChanged:Connect(function(input)
     end
 end))
 
-local launcher = create("TextButton", {
-    Name = "Launcher",
-    AnchorPoint = Vector2.new(0, 0.5),
-    Position = UDim2.new(0, 12, 0.5, 0),
-    Size = UDim2.fromOffset(50, 50),
-    BackgroundColor3 = COLORS.pinkDark,
-    BorderSizePixel = 0,
-    Text = "K",
-    TextColor3 = COLORS.white,
-    TextSize = 20,
-    Font = Enum.Font.GothamBold,
-    Visible = false,
-    ZIndex = 20,
-    Parent = gui,
-})
-round(launcher, 15)
-stroke(launcher, COLORS.pink, 2, 0)
+local launcher = create("TextButton", { Name = "Launcher", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 0), Size = UDim2.fromOffset(50, 50), BackgroundColor3 = COLORS.pinkDark, BorderSizePixel = 0, Text = "🔥", TextColor3 = COLORS.white, TextSize = 20, Font = Enum.Font.GothamBold, Visible = false, ZIndex = 20, Parent = gui })
+round(launcher, 15) stroke(launcher, COLORS.pink, 2, 0)
 
 hideButton.MouseButton1Click:Connect(function()
     if not main.Visible then return end
-    tween(hubScale, 0.2, {Scale = 0.82})  
-    tween(main, 0.2, {BackgroundTransparency = 0.18})  
-    task.delay(0.2, function()  
+    tween(hubScale, 0.25, {Scale = 0.8}, Enum.EasingStyle.Back, Enum.EasingDirection.In)  
+    tween(main, 0.2, {BackgroundTransparency = 1})  
+    tween(dropShadow, 0.2, {ImageTransparency = 1})
+    task.delay(0.25, function()  
         if main.Parent then  
-            main.Visible = false  
-            launcher.Visible = true  
-            launcher.Size = UDim2.fromOffset(38, 38)  
-            tween(launcher, 0.22, {Size = UDim2.fromOffset(50, 50)})  
+            main.Visible = false; launcher.Visible = true; launcher.Size = UDim2.fromOffset(38, 38)  
+            tween(launcher, 0.35, {Size = UDim2.fromOffset(50, 50)}, Enum.EasingStyle.Back)  
         end  
     end)
 end)
@@ -703,9 +496,10 @@ launcher.MouseButton1Click:Connect(function()
     launcher.Visible = false
     main.Visible = true
     hubScale.Scale = 0.8
-    main.BackgroundTransparency = 0.18
-    tween(hubScale, 0.24, {Scale = 1})
-    tween(main, 0.24, {BackgroundTransparency = 0})
+    main.BackgroundTransparency = 1
+    tween(hubScale, 0.4, {Scale = 1}, Enum.EasingStyle.Bounce)
+    tween(main, 0.25, {BackgroundTransparency = 0})
+    tween(dropShadow, 0.25, {ImageTransparency = 0.6})
 end)
 
 task.spawn(function()
@@ -720,9 +514,8 @@ task.spawn(function()
 end)
 
 -- ============================================================
--- MECÂNICAS: Luva, Anti-Slap e Funções Base
+-- LÓGICA DE DETECÇÃO DE LUVAS / ARMAS (100% Original)
 -- ============================================================
-
 local as = false
 local function dobv(v, char)
     if not as then return end
@@ -733,8 +526,7 @@ local function dobv(v, char)
     elseif v:IsA("BasePart") then v.ChildAdded:Connect(function(v2) dobv(v2, char) end) end  
 
     if undo and char and char:FindFirstChild("Humanoid") then  
-        char.Humanoid.Sit = false  
-        char.Humanoid.PlatformStand = false  
+        char.Humanoid.Sit = false; char.Humanoid.PlatformStand = false  
     end
 end
 
@@ -767,7 +559,6 @@ local function findGloveRemote(tool)
     if not tool or not tool:IsA("Tool") then return nil, 0 end
     local exactEvent = tool:FindFirstChild("Event", true)  
     if exactEvent and exactEvent:IsA("RemoteEvent") then return exactEvent, 400 end  
-
     local bestRemote, bestScore = nil, -1  
     for _, descendant in ipairs(tool:GetDescendants()) do  
         if descendant:IsA("RemoteEvent") then  
@@ -782,7 +573,6 @@ local function scanContainer(container, owner, location, recursive, baseScore)
     if not container then return nil, nil, nil, nil, -1 end
     local objects = recursive and container:GetDescendants() or container:GetChildren()  
     local bestTool, bestEvent, bestTotal = nil, nil, -1  
-
     for _, object in ipairs(objects) do  
         if object:IsA("Tool") then  
             local remote, remoteScore = findGloveRemote(object)  
@@ -800,7 +590,6 @@ local function getglove(forceRefresh)
         return gloveCache.tool, gloveCache.event, gloveCache.owner, gloveCache.location
     end
     invalidateGloveCache()  
-
     local tool, event, owner, location, bestScore = nil, nil, nil, nil, -1  
     local function consider(...)  
         local cTool, cEvent, fOwner, fLoc, score = scanContainer(...)  
@@ -810,11 +599,11 @@ local function getglove(forceRefresh)
     consider(localplr.Character, localplr, "Equipada", false, 1200)  
     consider(localplr:FindFirstChild("Backpack"), localplr, "Mochila", false, 1050)  
     for _, player in ipairs(Players:GetPlayers()) do  
-        if player ~= localplr then  
-            consider(player.Character, player, "Outro jogador equipado", false, 720)  
-        end  
+        if player ~= localplr then consider(player.Character, player, "Outro jogador equipado", false, 720) end  
     end  
-
+    consider(workspace, nil, "Workspace", true, 430)
+    consider(ReplicatedStorage, nil, "ReplicatedStorage", true, 350)
+    
     if event then gloveCache.tool = tool; gloveCache.event = event; gloveCache.owner = owner; gloveCache.location = location end  
     return tool, event, owner, location
 end
@@ -839,6 +628,14 @@ local function getMassTargets()
     return targets
 end
 
+local function cancelMassAction(showNotification)
+    massActionToken = massActionToken + 1
+    local wasRunning = massActionRunning
+    massActionRunning = false
+    setMassStatus("Ação em massa cancelada", COLORS.yellow)
+    if showNotification and wasRunning then notify("Ação em massa cancelada", COLORS.yellow) end
+end
+
 local function runMassAction(actionName, force, color)
     if massActionRunning then return notify("Já existe uma ação em massa rodando", COLORS.yellow) end
     massActionRunning = true; massActionToken = massActionToken + 1; local myToken = massActionToken  
@@ -861,6 +658,7 @@ local function runMassAction(actionName, force, color)
                 completed = completed + 1  
                 setMassStatus(actionName .. ": " .. completed .. "/" .. total, color)  
             end)  
+            task.wait(massDelay)
         end  
 
         while completed < total and myToken == massActionToken do task.wait(0.05) end  
@@ -868,16 +666,45 @@ local function runMassAction(actionName, force, color)
     end)
 end
 
+local function equipLocalGlove(silent)
+    local character = localplr.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local backpack = localplr:FindFirstChild("Backpack")
+    if not humanoid or not backpack then return end  
+    for _, tool in ipairs(backpack:GetChildren()) do  
+        if tool:IsA("Tool") and findGloveRemote(tool) then  
+            humanoid:EquipTool(tool)  
+            invalidateGloveCache()  
+            if not silent then notify("Luva equipada: " .. tool.Name, COLORS.green) end  
+            return  
+        end  
+    end  
+    if not silent then notify("Nenhuma luva na mochila", COLORS.red) end
+end
+
 -- ============================================================
--- ABA COMBATE: Novos Recursos
+-- ABA 1: COMBATE (Original + Hitbox + SafeFarm)
 -- ============================================================
+sectionTitle(combatPage, "DETECTOR DE LUVA")
+local gloveStatus = create("TextLabel", { Size = UDim2.new(1, -4, 0, 52), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, Text = "Procurando luva...", TextColor3 = COLORS.muted, TextSize = 10, Font = Enum.Font.GothamSemibold, TextWrapped = true, ZIndex = 4, Parent = combatPage })
+round(gloveStatus, 11) stroke(gloveStatus, COLORS.pinkDark, 1, 0.1)
 
-sectionTitle(combatPage, "COMBATE AVANÇADO")
+local function refreshGloveStatus(showNotification)
+    local tool, event, owner, location = getglove(true)
+    if tool and event then
+        local ownerText = owner == localplr and "Você" or (owner and owner.DisplayName or "Desconhecido")
+        gloveStatus.Text = "✓ " .. tool.Name .. "  •  " .. event.Name .. "\n" .. ownerText .. " — " .. tostring(location)
+        gloveStatus.TextColor3 = COLORS.green
+        if showNotification then notify("Luva detectada: " .. tool.Name, COLORS.green) end
+    else
+        gloveStatus.Text = "✕ Nenhuma Tool com RemoteEvent encontrada"
+        gloveStatus.TextColor3 = COLORS.red
+    end
+end
+actionButton(combatPage, "⌕  DETECTAR LUVA NOVAMENTE", COLORS.pinkSoft, function() refreshGloveStatus(true) end)
 
--- NOVO: Hitbox Expander
-local hitboxEnabled = false
-local hitboxSizeValue = 10
-
+sectionTitle(combatPage, "MODS VISUAIS & FARM")
+local hitboxEnabled, hitboxSizeValue = false, 10
 local function applyHitboxes()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localplr and player.Character then
@@ -885,93 +712,83 @@ local function applyHitboxes()
             if hrp then
                 if hitboxEnabled then
                     hrp.Size = Vector3.new(hitboxSizeValue, hitboxSizeValue, hitboxSizeValue)
-                    hrp.Transparency = 0.8
-                    hrp.BrickColor = BrickColor.new("Hot pink")
-                    hrp.Material = Enum.Material.Neon
-                    hrp.CanCollide = false
-                else
-                    hrp.Size = Vector3.new(2, 2, 1)
-                    hrp.Transparency = 1
-                end
+                    hrp.Transparency = 0.7; hrp.BrickColor = BrickColor.new("Hot pink"); hrp.Material = Enum.Material.Neon; hrp.CanCollide = false
+                else hrp.Size = Vector3.new(2, 2, 1); hrp.Transparency = 1 end
             end
         end
     end
 end
-
-toggleRow(combatPage, "Hitbox Expander", "Aumenta o tamanho dos inimigos para acertar mais fácil.", function(enabled)
+toggleRow(combatPage, "Hitbox Expander", "Aumenta o tamanho dos inimigos visivelmente.", function(enabled)
     hitboxEnabled = enabled
     applyHitboxes()
     toggleConnection("HitboxLoop", enabled, RunService.Heartbeat, applyHitboxes)
 end)
+stepper(combatPage, "Tamanho da Hitbox", 10, 2, 50, 2, "", function(val) hitboxSizeValue = val if hitboxEnabled then applyHitboxes() end end)
 
-stepper(combatPage, "Tamanho da Hitbox", 10, 2, 50, 2, "", function(val)
-    hitboxSizeValue = val
-    if hitboxEnabled then applyHitboxes() end
-end)
-
--- NOVO: Safe Farm
-local safeFarmEnabled = false
-local safePlatform = nil
-
-toggleRow(combatPage, "Safe Auto-Farm", "Teleporta para o céu e ataca automaticamente.", function(enabled)
+local safeFarmEnabled, safePlatform = false, nil
+toggleRow(combatPage, "Safe Auto-Farm", "Teleporta para o céu e ataca de longe.", function(enabled)
     safeFarmEnabled = enabled
-    local myChar = localplr.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    
+    local root = localplr.Character and localplr.Character:FindFirstChild("HumanoidRootPart")
     if enabled then
         if not safePlatform then
-            safePlatform = Instance.new("Part")
+            safePlatform = Instance.new("Part", workspace)
             safePlatform.Size = Vector3.new(50, 2, 50)
             safePlatform.Position = Vector3.new(0, 10000, 0)
-            safePlatform.Anchored = true
-            safePlatform.Transparency = 0.5
-            safePlatform.Parent = workspace
+            safePlatform.Anchored = true; safePlatform.Transparency = 0.5
         end
-        if myRoot then myRoot.CFrame = safePlatform.CFrame + Vector3.new(0, 5, 0) end
-        
+        if root then root.CFrame = safePlatform.CFrame + Vector3.new(0, 5, 0) end
         toggleConnection("SafeFarmLoop", true, RunService.Heartbeat, function()
-            if safeFarmEnabled then
-                local _, event = getglove()
-                if event then
-                    for _, target in ipairs(getMassTargets()) do
-                        if target.Character then pcall(function() event:FireServer("slash", target.Character, Vector3.new(0, 0, 0)) end) end
-                    end
+            local _, event = getglove()
+            if event then
+                for _, target in ipairs(getMassTargets()) do
+                    if target.Character then pcall(function() event:FireServer("slash", target.Character, Vector3.new(0, 0, 0)) end) end
                 end
             end
         end)
     else
         if safePlatform then safePlatform:Destroy() safePlatform = nil end
         toggleConnection("SafeFarmLoop", false)
-        -- Tenta voltar ao chao recarregando (se quiser pode só cair)
-        if myRoot then myRoot.CFrame = myRoot.CFrame - Vector3.new(0, 9500, 0) end
+        if root then root.CFrame = root.CFrame - Vector3.new(0, 9500, 0) end
     end
 end)
 
-sectionTitle(combatPage, "MECÂNICAS CLÁSSICAS")
-
-toggleRow(combatPage, "Anti-Slap / Fling", "Remove forças de arremesso detectadas.", function(enabled)
-    as = enabled
-    if enabled and localplr.Character then dc(localplr.Character) end
-end)
-
-local auraEnabled = false
-local auraRange = 32
-toggleRow(combatPage, "Slap Aura", "Ataca jogadores dentro do alcance definido.", function(enabled) auraEnabled = enabled end)
+sectionTitle(combatPage, "MECÂNICAS & AURA")
+toggleRow(combatPage, "Anti-Slap / Fling", "Remove forças de arremesso.", function(enabled) as = enabled if enabled and localplr.Character then dc(localplr.Character) end end)
+local auraEnabled, auraRange = false, 32
+toggleRow(combatPage, "Slap Aura", "Ataca jogadores no alcance.", function(enabled) auraEnabled = enabled end)
 stepper(combatPage, "Alcance da Aura", 32, 8, 60, 4, "", function(value) auraRange = value end)
+
+sectionTitle(combatPage, "AÇÕES EM MASSA")
+local autoEquipEnabled = false
+toggleRow(combatPage, "Auto Equip", "Equipa luva automaticamente.", function(enabled) autoEquipEnabled = enabled if enabled then equipLocalGlove(false) end end)
+
+massStatus = create("TextLabel", { Size = UDim2.new(1, -4, 0, 46), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, Text = "Pronto para executar", TextColor3 = COLORS.muted, TextSize = 10, Font = Enum.Font.GothamSemibold, TextWrapped = true, ZIndex = 4, Parent = combatPage })
+round(massStatus, 11) stroke(massStatus, COLORS.stroke, 1, 0.25)
+stepper(combatPage, "Tentativas por jogador", 3, 1, 5, 1, "x", function(value) massRetries = value end)
+stepper(combatPage, "Intervalo de envios", 50, 20, 250, 10, "ms", function(value) massDelay = value / 1000 end)
+toggleRow(combatPage, "Ignorar mesmo time", "Não ataca aliados.", function(enabled) ignoreSameTeam = enabled end)
 
 actionButton(combatPage, "💀  KILL ALL", COLORS.red, function() runMassAction("Kill All", -STRONG_SLAP_FORCE, COLORS.red) end)
 actionButton(combatPage, "💫  FLING ALL", COLORS.yellow, function() runMassAction("Fling All", STRONG_SLAP_FORCE, COLORS.yellow) end)
+actionButton(combatPage, "■  CANCELAR AÇÃO EM MASSA", COLORS.muted, function() cancelMassAction(true) end)
+actionButton(combatPage, "🧤  EQUIPAR LUVA", COLORS.pinkSoft, equipLocalGlove)
 
-toggleConnection("AuraLoop", true, RunService.Heartbeat, function()
+-- Main Combat Loop
+toggleConnection("CombatMainLoop", true, RunService.Heartbeat, function()
+    if autoEquipEnabled and localplr.Character then
+        local equipped = nil
+        for _, obj in ipairs(localplr.Character:GetChildren()) do if obj:IsA("Tool") and findGloveRemote(obj) then equipped = obj break end end
+        if not equipped then equipLocalGlove(true) end
+    end
     if auraEnabled and not massActionRunning and localplr.Character then
         local myRoot = localplr.Character:FindFirstChild("HumanoidRootPart")
         local _, event = getglove()
         if myRoot and event then
             for _, player in ipairs(Players:GetPlayers()) do
-                local targetChar = player.Character
-                if player ~= localplr and targetChar and targetChar:FindFirstChild("HumanoidRootPart") then
-                    local dist = (targetChar.HumanoidRootPart.Position - myRoot.Position).Magnitude
-                    if dist <= auraRange then pcall(function() event:FireServer("slash", targetChar, Vector3.new(0, -30, 0)) end) end
+                local tChar = player.Character
+                if player ~= localplr and tChar and tChar:FindFirstChild("HumanoidRootPart") then
+                    local dist = (tChar.HumanoidRootPart.Position - myRoot.Position).Magnitude
+                    if dist <= auraRange and dist > 3 then pcall(function() event:FireServer("slash", tChar, Vector3.new(0, -30, 0)) end) end
                 end
             end
         end
@@ -979,128 +796,162 @@ toggleConnection("AuraLoop", true, RunService.Heartbeat, function()
 end)
 
 -- ============================================================
--- ABA JOGADORES: Lista c/ Filtro
+-- ABA 2: JOGADORES (Lista Completa + Filtro)
 -- ============================================================
-
 sectionTitle(playerPage, "SELECIONE UM JOGADOR")
-
--- NOVO: Filtro
 local playerFilterText = ""
-searchBox(playerPage, "Pesquisar por nome...", function(text)
-    playerFilterText = text
-    -- O rebuild vai ser chamado abaixo globalmente
-end)
+searchBox(playerPage, "Pesquisar jogador...", function(text) playerFilterText = text end)
 
 local selectedPlayer = nil
-local playerList = create("ScrollingFrame", {
-    Size = UDim2.new(1, -4, 0, 145),
-    BackgroundColor3 = COLORS.card,
-    BorderSizePixel = 0,
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    ScrollBarThickness = 3,
-    ScrollBarImageColor3 = COLORS.pink,
-    ZIndex = 4,
-    Parent = playerPage,
-})
-round(playerList, 11)
+local selectedLabel = create("TextLabel", { Size = UDim2.new(1, -4, 0, 45), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, Text = "Nenhum jogador selecionado", TextColor3 = COLORS.muted, TextSize = 11, Font = Enum.Font.GothamSemibold, ZIndex = 4, Parent = playerPage })
+round(selectedLabel, 11) stroke(selectedLabel, COLORS.pinkDark, 1, 0.1)
+
+local playerList = create("ScrollingFrame", { Size = UDim2.new(1, -4, 0, 145), BackgroundColor3 = COLORS.card, BorderSizePixel = 0, AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3, ScrollBarImageColor3 = COLORS.pink, ZIndex = 4, Parent = playerPage })
+round(playerList, 11) stroke(playerList, COLORS.stroke, 1, 0.25)
 create("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.Name, Parent = playerList })
 create("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), Parent = playerList })
 
 local function rebuildPlayerList()
-    for _, child in ipairs(playerList:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
+    for _, child in ipairs(playerList:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+    local found = 0
     for _, player in ipairs(Players:GetPlayers()) do  
         if player ~= localplr and (playerFilterText == "" or string.find(string.lower(player.Name), playerFilterText) or string.find(string.lower(player.DisplayName), playerFilterText)) then  
-            local button = create("TextButton", {  
-                Name = player.Name, Size = UDim2.new(1, -2, 0, 37),  
-                BackgroundColor3 = selectedPlayer == player and COLORS.pinkDark or COLORS.card2,  
-                BorderSizePixel = 0, AutoButtonColor = false,  
-                Text = player.DisplayName .. "  (@" .. player.Name .. ")",  
-                TextColor3 = COLORS.white, TextSize = 10, Font = Enum.Font.GothamMedium, ZIndex = 5, Parent = playerList,  
-            })  
+            found = found + 1
+            local button = create("TextButton", { Name = player.Name, Size = UDim2.new(1, -2, 0, 37), BackgroundColor3 = selectedPlayer == player and COLORS.pinkDark or COLORS.card2, BorderSizePixel = 0, AutoButtonColor = false, Text = player.DisplayName .. "  (@" .. player.Name .. ")", TextColor3 = COLORS.white, TextSize = 10, Font = Enum.Font.GothamMedium, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 5, Parent = playerList })  
             round(button, 8)  
-            button.MouseButton1Click:Connect(function() selectedPlayer = player; rebuildPlayerList() end)  
+            button.MouseButton1Click:Connect(function() 
+                selectedPlayer = player; selectedLabel.Text = "Selecionado: " .. player.DisplayName; selectedLabel.TextColor3 = COLORS.pinkSoft; rebuildPlayerList() 
+            end)  
         end  
     end  
+    if found == 0 then selectedLabel.Text = "Nenhum jogador na lista" selectedLabel.TextColor3 = COLORS.muted end
 end
 
 track(Players.PlayerAdded:Connect(rebuildPlayerList))
-track(Players.PlayerRemoving:Connect(function(p) if selectedPlayer == p then selectedPlayer = nil end rebuildPlayerList() end))
--- Atualiza sempre que digitar
-track(RunService.Heartbeat:Connect(function()
-    if playerList:GetAttribute("LastFilter") ~= playerFilterText then
-        playerList:SetAttribute("LastFilter", playerFilterText)
-        rebuildPlayerList()
+track(Players.PlayerRemoving:Connect(function(player) if selectedPlayer == player then selectedPlayer = nil; selectedLabel.Text = "Nenhum jogador selecionado"; selectedLabel.TextColor3 = COLORS.muted end task.defer(rebuildPlayerList) end))
+toggleConnection("PlayerSearchLoop", true, RunService.Heartbeat, function() if playerList:GetAttribute("LastFilter") ~= playerFilterText then playerList:SetAttribute("LastFilter", playerFilterText); rebuildPlayerList() end end)
+actionButton(playerPage, "↻  ATUALIZAR LISTA", COLORS.pinkSoft, function() rebuildPlayerList() notify("Lista atualizada", COLORS.green) end)
+
+sectionTitle(playerPage, "AÇÕES INDIVIDUAIS")
+local function runSelectedAction(player, actionName, force, color)
+    if not player or not player.Character or not player.Character:FindFirstChildOfClass("Humanoid") then return notify("Jogador inválido", COLORS.red) end
+    task.spawn(function()
+        local _, event = getglove(true)
+        if not event then return notify("Sem luva", COLORS.red) end
+        pcall(function() event:FireServer("slash", player.Character, Vector3.new(0, force, 0)) end)
+        notify(actionName .. " enviado para " .. player.DisplayName, color)
+    end)
+end
+actionButton(playerPage, "💀  KILL SELECIONADO", COLORS.red, function() runSelectedAction(selectedPlayer, "Kill", -STRONG_SLAP_FORCE, COLORS.red) end)
+actionButton(playerPage, "💫  FLING SELECIONADO", COLORS.yellow, function() runSelectedAction(selectedPlayer, "Fling", STRONG_SLAP_FORCE, COLORS.yellow) end)
+actionButton(playerPage, "➜  IR ATÉ JOGADOR", COLORS.pinkSoft, function() 
+    if selectedPlayer and selectedPlayer.Character and selectedPlayer.Character:FindFirstChild("HumanoidRootPart") and localplr.Character and localplr.Character:FindFirstChild("HumanoidRootPart") then
+        localplr.Character.HumanoidRootPart.CFrame = selectedPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 4)
+        notify("Teleportado!", COLORS.green)
     end
-end))
+end)
+actionButton(playerPage, "◉  ESPECTAR JOGADOR", COLORS.pinkSoft, function() if selectedPlayer and selectedPlayer.Character and workspace.CurrentCamera then workspace.CurrentCamera.CameraSubject = selectedPlayer.Character:FindFirstChildOfClass("Humanoid") notify("Espectando " .. selectedPlayer.DisplayName, COLORS.pinkSoft) end end)
+actionButton(playerPage, "◉  PARAR DE ESPECTAR", COLORS.muted, function() if workspace.CurrentCamera and localplr.Character then workspace.CurrentCamera.CameraSubject = localplr.Character:FindFirstChildOfClass("Humanoid") notify("Câmera restaurada", COLORS.green) end end)
 
 -- ============================================================
--- ABA MOVIMENTO: Fly, Anti-Ragdoll e Otimização
+-- ABA 3: MOVIMENTO (Segurança 100% Original + Fly V2 + Anti-Void V2)
 -- ============================================================
-sectionTitle(movePage, "MOVIMENTO LIVRE")
-
--- NOVO: Fly Otimizado para Mobile
-local flyEnabled = false
-local flySpeed = 50
+sectionTitle(movePage, "MOVIMENTO LIVRE (V2)")
+local flyEnabled, flySpeed = false, 50
 local flyBV, flyBG
 
-toggleRow(movePage, "Voo (Fly Mobile)", "Voe na direção da câmera guiado pelo analógico.", function(enabled)
+toggleRow(movePage, "Voo (Fly Mobile V2)", "Voo extremamente suave com a câmera.", function(enabled)
     flyEnabled = enabled
     local char = localplr.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
     if enabled and root then
-        flyBV = Instance.new("BodyVelocity")
-        flyBV.MaxForce = Vector3.new(8999999488, 8999999488, 8999999488) -- Evita seu próprio Anti-Slap
-        flyBV.Velocity = Vector3.zero
-        flyBV.Parent = root
-        
-        flyBG = Instance.new("BodyGyro")
-        flyBG.MaxTorque = Vector3.new(8999999488, 8999999488, 8999999488)
-        flyBG.P = 9e4
-        flyBG.Parent = root
-        
-        if char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").PlatformStand = true
-        end
+        flyBV = Instance.new("BodyVelocity"); flyBV.MaxForce = Vector3.new(8999999488, 8999999488, 8999999488); flyBV.Velocity = Vector3.zero; flyBV.Parent = root
+        flyBG = Instance.new("BodyGyro"); flyBG.MaxTorque = Vector3.new(8999999488, 8999999488, 8999999488); flyBG.P = 9e4; flyBG.Parent = root
+        if char:FindFirstChildOfClass("Humanoid") then char:FindFirstChildOfClass("Humanoid").PlatformStand = true end
 
-        toggleConnection("FlyLoop", true, RunService.RenderStepped, function()
+        toggleConnection("FlyLoop", true, RunService.RenderStepped, function(deltaTime)
             if char and root and flyBV and flyBG then
                 local cam = workspace.CurrentCamera
                 local md = char:FindFirstChildOfClass("Humanoid").MoveDirection
-                if md.Magnitude > 0 then
-                    flyBV.Velocity = cam.CFrame.LookVector * (md.Z * -flySpeed) + cam.CFrame.RightVector * (md.X * flySpeed)
-                else
-                    flyBV.Velocity = Vector3.zero
-                end
-                flyBG.CFrame = cam.CFrame
+                local targetVel = Vector3.zero
+                if md.Magnitude > 0 then targetVel = cam.CFrame.LookVector * (md.Z * -flySpeed) + cam.CFrame.RightVector * (md.X * flySpeed) end
+                -- Interpolação super suave
+                flyBV.Velocity = flyBV.Velocity:Lerp(targetVel, 10 * deltaTime)
+                flyBG.CFrame = flyBG.CFrame:Lerp(cam.CFrame, 15 * deltaTime)
             end
         end)
     else
-        if flyBV then flyBV:Destroy() end
-        if flyBG then flyBG:Destroy() end
+        if flyBV then flyBV:Destroy() end if flyBG then flyBG:Destroy() end
         toggleConnection("FlyLoop", false)
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").PlatformStand = false
-        end
+        if char and char:FindFirstChildOfClass("Humanoid") then char:FindFirstChildOfClass("Humanoid").PlatformStand = false end
     end
 end)
-
 stepper(movePage, "Velocidade do Voo", 50, 20, 200, 10, "", function(val) flySpeed = val end)
 
-sectionTitle(movePage, "SEGURANÇA E PROTEÇÃO")
+sectionTitle(movePage, "SEGURANÇA & PROTEÇÃO")
+local antiVoidEnabled = false
+local lastSafeCFrame = nil
+-- Anti-Void V2 (Lógica Aprimorada)
+toggleRow(movePage, "Anti-Void V2", "Salva sua última pisada firme no chão e resgata.", function(enabled)
+    antiVoidEnabled = enabled
+    toggleConnection("AntiVoidLoop", enabled, RunService.Heartbeat, function()
+        local char = localplr.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum then return end
+        
+        local destroyY = workspace.FallenPartsDestroyHeight + 15
+        
+        if hum.FloorMaterial ~= Enum.Material.Air and root.Velocity.Y > -10 and root.Position.Y > destroyY + 20 then
+            lastSafeCFrame = root.CFrame
+        end
+        
+        if root.Position.Y <= destroyY or (lastSafeCFrame and root.Position.Y < lastSafeCFrame.Position.Y - 60) then
+            if lastSafeCFrame then
+                root.Velocity = Vector3.zero
+                root.AssemblyLinearVelocity = Vector3.zero
+                root.CFrame = lastSafeCFrame + Vector3.new(0, 5, 0)
+                notify("Anti-Void te resgatou!", COLORS.green)
+            end
+        end
+    end)
+end)
 
--- NOVO: Anti-Ragdoll
+-- Toda a estrutura de memória do Touch e Query original
+local antiPlatformEnabled, antiDamageEnabled = false, false
+local touchMemory, queryMemory, humanoidDamageMemory = setmetatable({}, {__mode = "k"}), setmetatable({}, {__mode = "k"}), setmetatable({}, {__mode = "k"})
+local antiDamageForceField = nil
+
+local function applyTouchShield(character)
+    for _, p in ipairs(character:GetDescendants()) do if p:IsA("BasePart") then if touchMemory[p] == nil then touchMemory[p] = p.CanTouch end p.CanTouch = false end end
+end
+local function restoreTouches()
+    for p, v in pairs(touchMemory) do if p and p.Parent then p.CanTouch = v end end table.clear(touchMemory)
+end
+local function applyDamageShield(character)
+    applyTouchShield(character)
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if hum then pcall(function() hum.BreakJointsOnDeath = false; hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false) if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end end) end
+    if not antiDamageForceField or antiDamageForceField.Parent ~= character then if antiDamageForceField then antiDamageForceField:Destroy() end antiDamageForceField = create("ForceField", { Name = "LeviAnti", Visible = false, Parent = character }) end
+end
+
+toggleRow(movePage, "Anti-Plataforma", "Ignora blocos de Touched.", function(enabled)
+    antiPlatformEnabled = enabled
+    toggleConnection("AntiPlatLoop", enabled, RunService.Stepped, function() if localplr.Character then applyTouchShield(localplr.Character) end end)
+    if not enabled then restoreTouches() end
+end)
+toggleRow(movePage, "Anti-Kill Parts", "Imortal para perigos locais.", function(enabled)
+    antiDamageEnabled = enabled
+    toggleConnection("AntiDamageLoop", enabled, RunService.Heartbeat, function() if localplr.Character then applyDamageShield(localplr.Character) end end)
+end)
+
 local antiRagdollEnabled = false
-toggleRow(movePage, "Anti-Ragdoll", "Impede que o personagem caia desmaiado.", function(enabled)
+toggleRow(movePage, "Anti-Ragdoll", "Impede tropeços e quedas bobas.", function(enabled)
     antiRagdollEnabled = enabled
     toggleConnection("AntiRagdollLoop", enabled, RunService.Stepped, function()
         local hum = localplr.Character and localplr.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-        end
+        if hum then hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false); hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false) end
     end)
 end)
 
@@ -1108,45 +959,75 @@ local noclipEnabled = false
 toggleRow(movePage, "Noclip", "Atravessar paredes.", function(enabled)
     noclipEnabled = enabled
     toggleConnection("NoclipLoop", enabled, RunService.Stepped, function()
-        if localplr.Character then
-            for _, p in ipairs(localplr.Character:GetDescendants()) do
-                if p:IsA("BasePart") then p.CanCollide = false end
+        if localplr.Character then for _, p in ipairs(localplr.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end
+    end)
+end)
+
+sectionTitle(movePage, "ESTATÍSTICAS")
+local movementEnabled = false
+local walkSpeedValue, jumpPowerValue = 16, 50
+toggleRow(movePage, "Velocidade / Pulo", "Mantém os valores escolhidos.", function(enabled)
+    movementEnabled = enabled
+    toggleConnection("SpeedJumpLoop", enabled, RunService.Heartbeat, function()
+        local hum = localplr.Character and localplr.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = walkSpeedValue; hum.UseJumpPower = true; hum.JumpPower = jumpPowerValue end
+    end)
+end)
+stepper(movePage, "Velocidade", 16, 8, 100, 4, "", function(value) walkSpeedValue = value end)
+stepper(movePage, "Força do Pulo", 50, 20, 200, 10, "", function(value) jumpPowerValue = value end)
+
+-- ============================================================
+-- ABA 4: MUNDO & UTILIDADES (Auto Emblema, ESP, Fullbright)
+-- ============================================================
+sectionTitle(worldPage, "COLETÁVEIS")
+local autoBadgeEnabled = false
+toggleRow(worldPage, "Auto Emblemas (Badge Farm)", "Toca em tudo do mapa para ganhar emblemas.", function(enabled)
+    autoBadgeEnabled = enabled
+    if enabled then notify("Coletando emblemas pelo mapa...", COLORS.pinkSoft) end
+    toggleConnection("AutoBadgeLoop", enabled, RunService.Heartbeat, function()
+        local myRoot = localplr.Character and localplr.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                -- Se o executor suporta firetouchinterest
+                if obj:IsA("TouchInterest") and obj.Parent then
+                    if typeof(firetouchinterest) == "function" then
+                        pcall(function()
+                            firetouchinterest(myRoot, obj.Parent, 0)
+                            firetouchinterest(myRoot, obj.Parent, 1)
+                        end)
+                    end
+                elseif obj:IsA("ProximityPrompt") then
+                    if typeof(fireproximityprompt) == "function" then
+                        pcall(function() fireproximityprompt(obj) end)
+                    end
+                end
             end
         end
     end)
 end)
 
-sectionTitle(movePage, "VISUAL E ESP")
-
--- MELHORIA: ESP com Nome e Distância
+sectionTitle(worldPage, "VISUAIS & OUTROS")
 local espEnabled = false
-toggleRow(movePage, "ESP Avançado", "Destaca jogadores através das paredes com Nome e Distância.", function(enabled)
+toggleRow(worldPage, "ESP de Jogadores", "Destaca os outros jogadores com Nome e Distância.", function(enabled)
     espEnabled = enabled
     toggleConnection("ESPLoop", enabled, RunService.Heartbeat, function()
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= localplr and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("HumanoidRootPart") then
-                -- Highlight
-                if not p.Character:FindFirstChild("LeviHubESP_Hi") then
-                    create("Highlight", { Name = "LeviHubESP_Hi", Adornee = p.Character, FillColor = COLORS.pink, FillTransparency = 0.6, OutlineColor = COLORS.white, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop, Parent = p.Character })
-                end
-                
-                -- Text (Nome + Distância)
+                if not p.Character:FindFirstChild("LeviHubESP_Hi") then create("Highlight", { Name = "LeviHubESP_Hi", Adornee = p.Character, FillColor = COLORS.pink, FillTransparency = 0.6, OutlineColor = COLORS.white, DepthMode = Enum.HighlightDepthMode.AlwaysOnTop, Parent = p.Character }) end
                 local head = p.Character.Head
                 local bill = head:FindFirstChild("LeviHubESP_Text")
                 if not bill then
-                    bill = create("BillboardGui", { Name = "LeviHubESP_Text", Size = UDim2.fromOffset(200, 50), ExtentsOffset = Vector3.new(0, 3, 0), AlwaysOnTop = true, Parent = head })
-                    create("TextLabel", { Name = "Label", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, TextColor3 = COLORS.white, TextStrokeTransparency = 0, TextSize = 12, Font = Enum.Font.GothamBold, Parent = bill })
+                    bill = create("BillboardGui", { Name = "LeviHubESP_Text", Size = UDim2.fromOffset(200, 50), ExtentsOffset = Vector3.new(0, 2, 0), AlwaysOnTop = true, Parent = head })
+                    create("TextLabel", { Name = "Label", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, TextColor3 = COLORS.white, TextStrokeTransparency = 0, TextSize = 10, Font = Enum.Font.GothamBold, Parent = bill })
                 end
-                
                 if localplr.Character and localplr.Character:FindFirstChild("HumanoidRootPart") then
                     local dist = math.floor((p.Character.HumanoidRootPart.Position - localplr.Character.HumanoidRootPart.Position).Magnitude)
-                    bill.Label.Text = p.DisplayName .. "\n[" .. dist .. "m]"
+                    bill.Label.Text = p.DisplayName .. " [" .. dist .. "m]"
                 end
             end
         end
     end)
-    
-    if not enabled then -- Limpeza
+    if not enabled then 
         for _, p in ipairs(Players:GetPlayers()) do
             if p.Character then
                 if p.Character:FindFirstChild("LeviHubESP_Hi") then p.Character.LeviHubESP_Hi:Destroy() end
@@ -1156,11 +1037,58 @@ toggleRow(movePage, "ESP Avançado", "Destaca jogadores através das paredes com
     end
 end)
 
--- Restaura UI Inicial
-main.Size = UDim2.fromOffset(285, 380)
-main.BackgroundTransparency = 0.15
-hubScale.Scale = 0.78
-tween(main, 0.3, {BackgroundTransparency = 0})
-tween(hubScale, 0.3, {Scale = 1})
+local fullbrightEnabled = false
+local originalLighting = { Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime, FogEnd = Lighting.FogEnd, GlobalShadows = Lighting.GlobalShadows }
+toggleRow(worldPage, "Fullbright", "Clareia todo o mapa e remove neblina.", function(enabled)
+    fullbrightEnabled = enabled
+    toggleConnection("FullbrightLoop", enabled, RunService.Heartbeat, function()
+        Lighting.Brightness = 3; Lighting.ClockTime = 14; Lighting.FogEnd = 100000; Lighting.GlobalShadows = false
+    end)
+    if not enabled then for p, v in pairs(originalLighting) do Lighting[p] = v end end
+end)
 
-task.delay(0.35, function() notify("Levi Hub v5 carregada com sucesso!", COLORS.pinkSoft) end)
+local infiniteJumpEnabled = false
+toggleRow(worldPage, "Pulo Infinito", "Permite pular continuamente no ar.", function(enabled) infiniteJumpEnabled = enabled end)
+track(UserInputService.JumpRequest:Connect(function()
+    if infiniteJumpEnabled and localplr.Character and localplr.Character:FindFirstChildOfClass("Humanoid") then
+        localplr.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end))
+
+local antiAfkEnabled = false
+toggleRow(worldPage, "Anti-AFK", "Evita desconexão automática.", function(enabled) antiAfkEnabled = enabled end)
+track(localplr.Idled:Connect(function() if antiAfkEnabled then VirtualUser:CaptureController(); VirtualUser:ClickButton2(Vector2.new(0, 0)) end end))
+
+-- ============================================================
+-- CHARACTER ADDED (Garante que tudo continue no respawn)
+-- ============================================================
+track(localplr.CharacterAdded:Connect(function(character)
+    touchMemory, queryMemory, humanoidDamageMemory = setmetatable({}, {__mode = "k"}), setmetatable({}, {__mode = "k"}), setmetatable({}, {__mode = "k"})
+    antiDamageForceField = nil; lastSafeCFrame = nil; invalidateGloveCache()
+    dc(character)
+    
+    track(character.ChildAdded:Connect(function(obj) if obj:IsA("Tool") then invalidateGloveCache() task.defer(function() refreshGloveStatus(false) end) end end))
+    track(character.ChildRemoved:Connect(function(obj) if obj:IsA("Tool") then invalidateGloveCache() end end))
+end))
+if localplr.Character then dc(localplr.Character) end
+
+local localBackpack = localplr:FindFirstChild("Backpack")
+if localBackpack then
+    track(localBackpack.ChildAdded:Connect(function(obj) if obj:IsA("Tool") then invalidateGloveCache() end end))
+    track(localBackpack.ChildRemoved:Connect(function(obj) if obj:IsA("Tool") then invalidateGloveCache() end end))
+end
+
+-- ============================================================
+-- INICIALIZAÇÃO
+-- ============================================================
+task.defer(function() refreshGloveStatus(false) rebuildPlayerList() end)
+
+main.Size = UDim2.fromOffset(285, 380)
+main.BackgroundTransparency = 1
+hubScale.Scale = 0.5
+updateMainSize()
+tween(main, 0.4, {BackgroundTransparency = 0})
+tween(hubScale, 0.5, {Scale = 1}, Enum.EasingStyle.Bounce)
+
+task.delay(0.35, function() notify("Levi Hub v6 carregada!", COLORS.pinkSoft) end)
+print("✅ Levi Hub Mobile v6 (Completa) Carregada com Sucesso!")
